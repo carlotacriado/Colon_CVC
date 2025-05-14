@@ -91,7 +91,7 @@ for fold_idx, (train_idx, test_idx) in enumerate(sgkf.split(features, labels, gr
     X_train_pca = pca.fit_transform(X_train_scaled)
     X_test_pca = pca.transform(X_test_scaled)
 
-    grid = GridSearchCV(SVC(kernel='rbf'), param_grid, cv=3)
+    grid = GridSearchCV(SVC(kernel='rbf'), param_grid, cv=5)
     grid.fit(X_train_pca, y_train)
     y_pred = grid.predict(X_test_pca)
 
@@ -109,6 +109,44 @@ for fold_idx, (train_idx, test_idx) in enumerate(sgkf.split(features, labels, gr
             'Support': metrics['support'],
             'Setup': 'StratifiedGroupKFold + MinorSplit'
         })
+
+
+nkf = KFold(n_splits=5, shuffle=True, random_state=42)
+for fold_idx, (train_idx, test_idx) in enumerate(nkf.split(features, labels)):
+    X_train = np.concatenate([features[train_idx], minor_X_train])
+    y_train = np.concatenate([labels[train_idx], minor_y_train])
+    X_test = np.concatenate([features[test_idx], minor_X_test])
+    y_test = np.concatenate([labels[test_idx], minor_y_test])
+
+    scaler = StandardScaler() # escalamos los datos 
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    pca = PCA(n_components=25)
+    X_train_pca = pca.fit_transform(X_train_scaled)
+    X_test_pca = pca.transform(X_test_scaled)
+
+    grid = GridSearchCV(SVC(kernel='rbf'), param_grid, cv=5)
+    grid.fit(X_train_pca, y_train)
+    y_pred = grid.predict(X_test_pca)
+
+    report = classification_report(
+        y_test, y_pred, labels=np.arange(len(class_names)), target_names=class_names, output_dict=True, zero_division=0
+    )
+    for class_name in class_names:
+        metrics = report.get(class_name, {'precision': 0, 'recall': 0, 'f1-score': 0, 'support': 0})
+        results.append({
+            'Fold': fold_idx + 1,
+            'Class': class_name,
+            'Precision': metrics['precision'],
+            'Recall': metrics['recall'],
+            'F1-Score': metrics['f1-score'],
+            'Support': metrics['support'],
+            'Setup': 'Random KFold'
+        })
+
+
+
 
 # --- Guardar en CSV ---
 df_results = pd.DataFrame(results)
